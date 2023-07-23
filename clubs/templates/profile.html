@@ -1,0 +1,220 @@
+<link href="https://cdn.jsdelivr.net/npm/simple-datatables@latest/dist/style.css" rel="stylesheet" type="text/css">
+<script src="https://cdn.jsdelivr.net/npm/simple-datatables@latest" type="text/javascript"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.6.2/chart.min.js"
+        integrity="sha512-tMabqarPtykgDtdtSqCL3uLVM0gS1ZkUAVhRFu1vSEFgvB73niFQWJuvviDyBGBH22Lcau4rHB5p2K2T0Xvr6Q=="
+        crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+
+{% extends 'base_content.html' %}
+{% block title %} | User profile{% endblock %}
+{% block content %}
+
+    <div class="container">
+        <div class="row">
+            <div class="col-sm-8">
+                <img style="border-radius: 8px; float:right; margin-left: 20px; margin-bottom: 10px;"
+                     src="{{ requested_user.gravatar }}" alt="{{ requested_user.full_name }}'s profile picture">
+                <h1>{{ requested_user.full_name }}</h1>
+                <p>{{ requested_user.bio }}</p>
+
+                {% if all_user_clubs %}
+                    <h5>Clubs</h5>
+                    <table id="user-clubs-table" class="table table-hover">
+                        <thead>
+                        <tr>
+                            <th scope="col">Name</th>
+                            <th scope="col">Position</th>
+                            <th scope="col">Elo rating</th>
+                        </tr>
+                        </thead>
+                        {% for club in all_user_clubs %}
+                            <tr>
+                                <td><a href="{% url 'club_page' club.0.id %}">{{ club.0.name }}</a></td>
+                                <td>
+                                    {{ club.1 }}
+                                </td>
+                                <td
+                                        {% if club.0 in user_clubs %}
+                                            >{{ club.2 }}
+                                        {% else %}
+                                            class="text-muted">Hidden
+                                        {% endif %}
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </table>
+                {% endif %}
+
+                {% if requested_user.get_number_of_tournaments_participated_in > 0 %}
+                    <h5>Tournaments</h5>
+                    <table id="user-tournaments-table" class="table table-hover">
+                        <thead>
+                        <tr>
+                            <th scope="col">Name</th>
+                            <th scope="col">Outcome</th>
+                        </tr>
+                        </thead>
+                        {% for tournament in requested_user.participates_in.all %}
+                            <tr>
+                                <td><a href="{% url 'view_tournament' tournament.id %}">{{ tournament.name }}</a></td>
+                                <td>
+                                    {% if tournament in requested_user.tournament_wins.all %}
+                                        Winner!
+                                    {% elif tournament in requested_user.participates_in.all and tournament.winner %}
+                                        Participated <!-- later, try add round in the tournament they lost in -->
+                                    {% else %}
+                                        Ongoing
+                                    {% endif %}
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </table>
+                {% endif %}
+            </div>
+
+            <div class="col-sm-4">
+                <div class="card">
+                    <div class="card-body">
+                        <h6 class="card-subtitle mb-2 text-muted">Personal statement</h6>
+                        <p class="card-text">{{ requested_user.personal_statement }}</p>
+                    </div>
+                </div>
+
+                <br>
+
+                <ul class="list-group">
+                    {% if requested_user == user %}
+                        <li class="list-group-item"><b>Email address:</b> {{ requested_user.email }}</li>
+                    {% endif %}
+                    <li class="list-group-item"><b>Chess experience:</b> {{ requested_user.chess_exp }}</li>
+                    <li class="list-group-item"><b>Number of clubs:</b> {{ all_user_clubs|length }}</li>
+                    <li class="list-group-item"><b>Highest elo rating:</b> {{ requested_user.get_highest_elo }}</li>
+                    <li class="list-group-item"><b>Lowest elo rating:</b> {{ requested_user.get_lowest_elo }}</li>
+                    <li class="list-group-item"><b>Average elo rating:</b> {{ requested_user.get_mean_elo }}</li>
+                </ul>
+
+                <br>
+
+                {% if requested_user.get_number_of_tournaments_won > 0 or requested_user.get_number_of_tournaments_lost > 0 %}
+                    <div class="card">
+                    <div class="card-body">
+                    <h6 class="card-subtitle mb-2 text-muted">Tournaments</h6>
+                    <div>
+                        <canvas id="tournament_chart"></canvas>
+                    </div>
+                    <br>
+                {% endif %}
+                <ul class="list-group">
+                    <li class="list-group-item"><b>Tournaments participated in:</b> {{ requested_user.get_number_of_tournaments_participated_in }}</li>
+                    <li class="list-group-item"><b>Tournaments won:</b> {{ requested_user.get_number_of_tournaments_won }}</li>
+                    <li class="list-group-item"><b>Tournaments lost:</b> {{ requested_user.get_number_of_tournaments_lost }}</li>
+                </ul>
+                {% if requested_user.get_number_of_tournaments_won > 0 or requested_user.get_number_of_tournaments_lost > 0 %}
+                    </div>
+                    </div>
+                {% endif %}
+
+                <br>
+
+                {% if requested_user.get_number_of_matches_played > 0 %}
+                    <div class="card">
+                    <div class="card-body">
+                    <h6 class="card-subtitle mb-2 text-muted">Matches</h6>
+                    <div>
+                        <canvas id="match_chart"></canvas>
+                    </div>
+                    <br>
+                {% endif %}
+                <ul class="list-group">
+                    <li class="list-group-item"><b>Matches played:</b> {{ requested_user.get_number_of_matches_played }}
+                    </li>
+                    <li class="list-group-item"><b>Matches won:</b> {{ requested_user.get_number_of_matches_won }}</li>
+                    <li class="list-group-item"><b>Matches lost:</b> {{ requested_user.get_number_of_matches_lost }}
+                    </li>
+                </ul>
+                {% if requested_user.get_number_of_matches_played > 0 %}
+                    </div>
+                    </div>
+                {% endif %}
+
+                <br>
+
+                {% if requested_user == user %}
+                    <a class="btn btn-outline-secondary" style="width: 100%;" href="{% url 'edit_profile' %}">Edit
+                        profile</a>
+                    <br><br>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <script>
+        {% if all_user_clubs %}
+            const dataTable = new simpleDatatables.DataTable("#user-clubs-table", {
+                perPage: 5
+            });
+        {% endif %}
+
+        {% if requested_user.get_number_of_matches_played > 0 %}
+            const matchChart = new Chart(document.getElementById("match_chart"), {
+                type: 'pie',
+                data: {
+                    labels: ['Wins', 'Losses', 'Draws'],
+                    datasets: [{
+                        data: [{{ requested_user.get_number_of_matches_won }},
+                            {{ requested_user.get_number_of_matches_lost }},
+                            {{ requested_user.get_number_of_matches_played }} - {{ requested_user.get_number_of_matches_won }} - {{ requested_user.get_number_of_matches_lost }}],
+                        backgroundColor: [
+                            'rgba(75, 192, 192, 0.2)',
+                            'rgba(255, 99, 132, 0.2)',
+                            'rgba(128, 128, 128, 0.2)'
+                        ],
+                        borderColor: [
+                            'rgba(75, 192, 192, 1)',
+                            'rgba(255, 99, 132, 1)',
+                            'rgba(128, 128, 128, 1)'
+                        ],
+                        borderWidth: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false
+                }
+            });
+        {% endif %}
+
+        {% if requested_user.get_number_of_tournaments_participated_in > 0 %}
+            const dataTableTwo = new simpleDatatables.DataTable("#user-tournaments-table", {
+                perPage: 5
+            });
+
+            const tournamentChart = new Chart(document.getElementById("tournament_chart"), {
+                type: 'pie',
+                data: {
+                    labels: ['Wins', 'Losses', 'Ongoing'],
+                    datasets: [{
+                        data: [{{ requested_user.get_number_of_tournaments_won }},
+                            {{ requested_user.get_number_of_tournaments_lost }},
+                            {{ requested_user.get_number_of_tournaments_participated_in }} - {{ requested_user.get_number_of_tournaments_won }} - {{ requested_user.get_number_of_tournaments_lost }}],
+                        backgroundColor: [
+                            'rgba(75, 192, 192, 0.2)',
+                            'rgba(255, 99, 132, 0.2)',
+                            'rgba(128, 128, 128, 0.2)'
+                        ],
+                        borderColor: [
+                            'rgba(75, 192, 192, 1)',
+                            'rgba(255, 99, 132, 1)',
+                            'rgba(128, 128, 128, 1)'
+                        ],
+                        borderWidth: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false
+                }
+            });
+        {% endif %}
+    </script>
+
+{% endblock %}
